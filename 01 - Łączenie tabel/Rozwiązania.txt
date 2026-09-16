@@ -68,4 +68,33 @@ where l.city in ('Stretford',
 group by l.city
 	
 
+/*
+7. Pokaż nazwy departamentów wraz z nazwiskami ich szefów i miejscem pracy
+(11 wierszy)
+
+*/
+
+
+select 
+    e.first_name boss_first_name,
+    e.last_name boss_last_name,
+    d.department_name,
+    l.city
+    from employees e join departments d on e.employee_id = d.manager_id
+    				     join locations l on d.location_id = l.location_id
+
+
+/*
+8. Zmodyfikuj powyższe zapytanie w taki sposób, by zostały wyświetlone departamenty
+nie posiadające szefa. Wybierz właściwy typ połączenia tabel(27 wierszy)
+*/
+select 
+    e.first_name boss_first_name,
+    e.last_name boss_last_name,
+    d.department_name,
+    l.city
+    from employees e right join departments d on e.employee_id = d.manager_id
+    				     join locations l on d.location_id = l.location_id
+	
+
 	
