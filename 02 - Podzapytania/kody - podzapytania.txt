@@ -1,0 +1,218 @@
+--Podzapytania
+
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	department_id 
+	from employees 
+where
+	department_id = 
+	(select department_id 
+		from departments where department_name = 'Shipping')
+
+explain (analyze, buffers)		
+select 
+	first_name,
+	last_name,
+	department_id 
+from employees 
+where
+	department_id in 
+	(select department_id from departments 
+		where department_name in ('Shipping','Administration'))
+
+explain (analyze, buffers)		
+select 
+	first_name,
+	last_name,
+	e.department_id 
+from employees e join departments d on e.department_id = d.department_id
+where department_name in ('Shipping','Administration')
+
+--ANY, ALL
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	salary,
+	department_id
+from employees
+where salary > ANY (select salary from employees
+						where department_id = 20)
+
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	salary,
+	department_id
+from employees
+where salary > (select min(salary) from employees
+						where department_id = 20)
+
+
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	salary,
+	department_id
+from employees
+where salary > ALL (select salary from employees
+						where department_id = 20)
+
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	salary,
+	department_id
+from employees
+where salary > (select max(salary) from employees
+						where department_id = 20)
+
+--korelacja
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	salary,
+	department_id
+from employees e
+where salary > (select avg(salary) from employees
+					where department_id = e.department_id)
+
+
+--EXISTS
+select 
+	department_name
+from departments d
+where 
+	EXISTS (select 1 from employees
+				where department_id = d.department_id )
+
+select 
+	department_name
+from departments d
+where 
+	not EXISTS (select 1 from employees
+				where department_id = d.department_id )					
+					
+select 
+	first_name,
+	last_name,
+	salary + (salary * coalesce(commission_pct,0)) full_salary
+from employees e
+where full_salary > 5000
+
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	salary + (salary * coalesce(commission_pct,0)) full_salary
+from employees e
+where 
+	salary + (salary * coalesce(commission_pct,0)) > 5000
+	
+--derrived table
+explain (analyze, buffers)
+select 
+	* 
+	from( 
+			select 
+			first_name,
+			last_name,
+			salary + (salary * 	coalesce(commission_pct,0)) full_salary
+			from employees e ) t1
+where t1.full_salary > 5000
+
+--derrived column
+explain (analyze, buffers)
+select 
+	first_name,
+	last_name,
+	(select department_name from departments where department_id = e.department_id) dep_name
+from employees e
+
+--wielokolumnowe
+select
+e.last_name,
+e.salary
+from employees e
+where
+(department_id, salary) 
+	in 
+	(select department_id, max(salary) 
+		from employees
+		group by department_id)
+
+--CTE
+WITH high_earn 
+	AS (
+	SELECT last_name, salary
+	FROM employees
+	WHERE salary > 10000)
+SELECT *
+FROM high_earn;
+
+explain (analyze, buffers)
+WITH q1 
+	AS (
+	SELECT last_name, employee_id, manager_id
+	FROM employees)
+SELECT 
+	*
+FROM q1 q1 join q1 q2 on q1.employee_id = q2.manager_id ;
+
+explain (analyze, buffers)
+SELECT q1.last_name, q1.employee_id, q1.manager_id
+	FROM employees q1 join employees q2 on q1.employee_id = q2.manager_id
+	
+
+WITH RECURSIVE hierarchia AS (
+-- Kotwica: pracownicy bez managera (top-level)
+SELECT
+	employee_id,
+	last_name,
+	manager_id,
+	1 AS poziom,
+	last_name::TEXT AS sciezka
+FROM employees
+	WHERE manager_id IS NULL
+UNION ALL
+-- Rekurencja: dołączamy podwładnych
+SELECT
+	e.employee_id,
+	e.last_name,
+	e.manager_id,
+	h.poziom + 1,
+	h.sciezka || ' > ' || e.last_name
+	FROM employees e JOIN hierarchia h ON e.manager_id = h.employee_id)
+SELECT
+	*
+FROM hierarchia
+ORDER BY sciezka;
+
+
+--materialized 
+-- Wymuszenie materializacji (zapisanie wyniku do tymczasowej struktury)
+explain (analyze, buffers)
+WITH dane AS MATERIALIZED (
+	SELECT 
+	e.last_name, 
+	d.department_id, 
+	d.department_name 
+	FROM employees e join departments d on e.department_id = d.department_id 
+)
+SELECT * FROM dane WHERE department_id < 100;
+
+create materialized view mv_1
+as
+select * from employees
+
+explain (analyze, buffers)
+select * from mv_1
+
+
+
