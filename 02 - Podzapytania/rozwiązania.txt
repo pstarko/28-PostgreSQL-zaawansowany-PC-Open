@@ -37,7 +37,89 @@ update employees e set hire_date = 	'2013-06-17' where employee_id = 100
 					
 	
 	
+/*
+3. Zobacz najdłużej pracujących pracowników każdego działu. (12 wierszy)
+*/
+explain (analyze, buffers)
+select 
+	e.last_name ,
+	e.hire_date ,
+	d.department_id ,
+	d.department_name 
+	from employees e join departments d on e.department_id = d.department_id 
+where 
+	(e.department_id, hire_Date) in (
+									select 
+										department_id,
+										min(hire_Date)
+										from employees e 
+									group by department_id )
+
 	
+	
+/*
+4. Wyświetlaj te nazwy stanowisk, w których nie zatrudniono nikogo z działu
+MARKETING. Wykorzystaj podzapytanie w podzapytaniu (17 wierszy)
+*/
+
+explain (analyze, buffers)
+select * from jobs
+where
+	job_id in (select job_id from employees
+					where department_id not in (select department_id
+												from departments
+												where 
+												department_name='Marketing'))
+	
+	
+	
+	
+	
+/*
+7. Użyj skorelowanego podzapytania, aby wyświetlić informacje o pracowniku
+niezatrudnionym w żadnym dziale (użyj właściwej formy operatora EXISTS) (1 wiersz)
+
+*/
+explain (analyze, buffers)
+select
+    e.first_name,
+    e.last_name
+    from employees e 
+    where not exists (select 1 from departments dd where dd.department_id = e.department_id)
+	
+
+	
+	
+/*
+8. Wyświetl nazwę działu, który płaci Twoim pracownikom najwięcej pieniędzy
+miesięcznie(1 wiersz)
+
+*/
+
+explain (analyze, buffers)
+
+select 
+	(select department_name from departments d where d.department_id = e.department_id) department_name
+	from employees e 
+group by department_id 
+having 
+	sum(salary) = 
+		(select max(salary) 
+				from (					
+					select 
+						sum(salary) salary
+						from employees e 
+					group by department_id) t1 )
+	
+	
+	
+	
+	
+	
+	
+	
+	
+		
 	
 	
 	
