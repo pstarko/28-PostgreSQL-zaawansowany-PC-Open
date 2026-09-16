@@ -1,0 +1,117 @@
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    o.order_id,
+    o.order_date,
+    c.customer_name,
+    SUM(oi.quantity * oi.unit_price) AS total_amount
+FROM orders o
+JOIN customers c
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON oi.order_id = o.order_id
+WHERE o.order_date >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY
+    o.order_id,
+    o.order_date,
+    c.customer_name
+ORDER BY total_amount DESC
+LIMIT 25;
+
+show max_parallel_workers_per_gather
+
+
+SHOW min_parallel_table_scan_size;
+SHOW min_parallel_index_scan_size;
+
+SHOW parallel_setup_cost;
+
+
+CREATE INDEX idx_orders_recent_completed
+ON orders (order_date)
+
+--indeksy filtrowane
+select * from orders
+
+
+
+CREATE INDEX idx_orders_recent_completed
+ON orders (order_date)
+where status = 'completed'
+
+--360258
+EXPLAIN (ANALYZE, BUFFERS)
+select count(*) from orders
+where status = 'completed'
+
+
+
+
+analyze orders
+
+
+--indeksy pokrywające
+select * from orders
+
+CREATE INDEX idx_orders_covering_recent_completed
+ON orders (order_date DESC, status)
+INCLUDE (order_id, customer_id);
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    order_id,
+    customer_id,
+    order_date,
+    status
+FROM orders
+WHERE order_date >= CURRENT_DATE - INTERVAL '30 days'
+  AND status = 'completed'
+ORDER BY order_date DESC
+LIMIT 100;
+
+
+SELECT reltoastrelid::regclass AS toast_table
+FROM pg_class
+WHERE oid = 'orders'::regclass;
+
+--Sprawdzenie kolumn podatnych na TOAST
+SELECT attname, format_type(atttypid, atttypmod) AS typ
+FROM pg_attribute
+WHERE attrelid = 'orders'::regclass
+  AND atttypid IN (
+    SELECT oid FROM pg_type WHERE typname IN ('text', 'bytea', 'jsonb', 'varchar', 'aclitem', 'xml')
+  )
+  AND attnum > 0
+  AND NOT attisdropped;
+
+
+--defragmentacji 
+create table orders_2 as select * from orders
+
+create index idx_id on orders_2(order_id)
+
+reindex index idx_id
+
+--11MB -> 21 MB -> 11 MB
+SELECT 
+  relname AS indeks,
+  pg_size_pretty(pg_relation_size(indexrelid)) AS rozmiar_indeksu
+FROM pg_stat_user_indexes
+WHERE relname = 'orders_2';
+
+--40 MB -> 79 MB ->39 MB
+SELECT pg_size_pretty(pg_relation_size('orders_2')) AS tabela_size;
+
+vacuum full orders_2
+
+analyze orders_2
+
+select * from orders_2 o 
+
+update orders_2 o set status ='completed'
+
+
+
+--sprawdzenie martwych wierszy
+SELECT 
+	*
+FROM pg_stat_user_tables
