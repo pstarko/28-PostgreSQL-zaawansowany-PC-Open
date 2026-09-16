@@ -36,4 +36,4 @@ Przed szkoleniem zainstaluj:
 
 
 ```bash
-git clone https://github.com/pstarko/12-Podstawy-PostgreSQL-PCOpen.git
+git clone https://github.com/pstarko/28-PostgreSQL-zaawansowany-PC-Open.git
