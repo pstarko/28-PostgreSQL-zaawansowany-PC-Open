@@ -26,3 +26,60 @@ FROM
 GROUP BY
     date_part('year', hire_date),
     j.job_title
+
+/*
+3. Posortuj dane pracowników po job_title. Pokaż first and last name oraz salary. W dodatkowej
+kolumnie pokaż ile w sumie wydajemy dla całego etatu. Kolejna kolumna to procent udziału
+poszczególnego pracownika w wydatkach na etat (107 wierszy)
+*/
+explain (analyze)
+with
+	q1 as (
+			select
+				j.job_title,
+				e.first_name,
+				e.last_name,
+				e.salary,
+				sum(salary) over (partition by j.job_title) suma_jobs
+				from employees e join jobs j on e.job_id = j.job_id )
+select
+	q1.*,
+	round(q1.salary / q1.suma_jobs  * 100, 2) || ' %' prct
+	from q1
+
+
+/*
+5. Pokaż raport pracowników zatrudnionych w poszczególnych departamentach (11 wierszy)
+
+6. Zaktualizuj powyższe zapytanie w taki sposób, by otrzymać tylko pierwsze dwa nazwiska (11
+wierszy)
+*/
+--5
+SELECT
+    d.department_name,
+    STRING_AGG(last_name,',' ORDER BY last_name) AS lista_klientow
+FROM
+    employees e join departments d on e.department_id=d.department_id
+group by
+    d.department_name
+    
+    
+    
+--6
+WITH t1 AS (
+    SELECT
+        department_name,
+        last_name,
+        RANK() OVER (PARTITION BY department_name ORDER BY last_name) rn
+    FROM
+        employees e JOIN departments d ON e.department_id = d.department_id
+)
+SELECT
+    t1.department_name,
+    STRING_AGG(t1.last_name, ', ')
+FROM
+    t1
+WHERE
+    t1.rn <= 2
+GROUP BY
+    t1.department_name;
