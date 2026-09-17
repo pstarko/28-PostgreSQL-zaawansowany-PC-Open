@@ -50,3 +50,29 @@ select
 								  join locations l on d.location_id=l.location_id ) t1
 where 
 	t1.rank in (1,2,3)
+
+
+
+/*
+4. Wygeneruj poniższy raport z wykorzystaniem PERCENT RANK (11 wierszy).
+*/
+explain (analyze, buffers)
+select 
+	t1.department_name ,
+	t1.ilosc,
+	case 
+		when ilosc = (select max(t2.ilosc) from (select count(*) ilosc from employees group by department_id) t2) 
+			then 'Departament z największą ilością pracowników'
+		when ilosc = (select min(t2.ilosc) from (select count(*) ilosc from employees group by department_id) t2) 
+			then 'Departament z najmniejszą ilością pracowników'
+		else t1.opis
+	end	
+	from (
+		select 
+			d.department_name ,
+			count(e.employee_id) ilosc,
+			PERCENT_RANK() over (order by count(e.employee_id) desc) * 100 || ' % departmentów z większą ilością pracowników' opis
+			from employees e join departments d on e.department_id=d.department_id
+		group by 
+			d.department_name ) t1
+
