@@ -1,0 +1,52 @@
+/*
+1. Zbuduj zapytanie, które dla każdego pracownika pokaże jego miejsce zatrudnienia. Następnie
+utwórz ranking pracowników ze względu na zarobki bez prowizji(106 wierszy)
+*/
+explain (analyze, buffers)
+select 
+	e.last_name,
+	e.salary,
+	l.city,
+	rank() over (order by e.salary DESC) rank
+	from employees e join departments d on e.department_id=d.department_id
+					 join locations l on d.location_id=l.location_id
+
+
+/*
+2. Zmodyfikuj zapytanie z p. 1 w taki sposób, aby w zbiorze wynikowym pojawiła się dodatkowa
+kolumna pokazująca ranking gęsty. Usuń z rankingu gęstego pozycję 4,5,8 (103 wiersze)
+*/
+
+select
+	*
+	from (
+		select 
+		    e.last_name,
+		    e.salary,
+		    l.city,
+		    rank() over (order by e.salary) rank,
+		    dense_rank() over (order by e.salary) rank_d
+			from employees e join departments d on e.department_id=d.department_id
+								  join locations l on d.location_id=l.location_id ) t1
+where 
+	t1.rank_d not in (4,5,8)
+
+/*
+3. Zmodyfikuj zapytanie z poprzedniego punktu w taki sposób, aby otrzymać dane jedynie
+trzech pierwszych pracowników w rankingu pensji (weź pod uwagę ranking zwykły) ze
+względu na miasto. Wykorzystaj do filtrowania danych WHERE, a nie LIMIT(17 wierszy)
+*/
+explain (analyze, buffers)
+select
+	*
+	from (
+		select 
+		    e.last_name,
+		    e.salary,
+		    l.city,
+		    rank() over (partition by l.city order by e.salary desc) rank,
+		    dense_rank() over (order by e.salary) rank_d
+			from employees e join departments d on e.department_id=d.department_id
+								  join locations l on d.location_id=l.location_id ) t1
+where 
+	t1.rank in (1,2,3)
