@@ -1,0 +1,92 @@
+--funkcje rankingowe
+
+explain (analyze, buffers)
+SELECT
+	last_name,
+	salary,
+	row_number() over (order by salary) row_number
+FROM
+	employees
+
+create index idx_salary on employees(salary)
+
+
+explain (analyze, buffers)
+SELECT
+	last_name,
+	salary,
+	department_id,
+	row_number() over (partition by department_id order by salary) row_number
+FROM
+	employees
+	
+explain (analyze, buffers)
+SELECT
+	salary
+FROM
+	employees
+where salary > 5000
+order by salary
+
+explain (analyze, buffers)
+SELECT
+	last_name,
+	salary,
+	rank() over (order by salary desc) rank,
+	dense_rank() over (order by salary desc) drank
+FROM
+	employees
+
+select
+	t1.val,
+	cume_dist() over (order by t1.val) cume_dist,
+	percent_rank() over (order by t1.val) pr
+from(
+	SELECT
+	100 as val 
+	union
+	SELECT
+	200 as val 
+	union
+	SELECT
+	300 as val 
+	union
+	SELECT
+	600 as val ) t1
+	
+	
+	
+SELECT
+	last_name,
+	job_id,
+	salary,
+	ntile(4) over (order by salary ) ntile
+FROM
+	employees
+where 
+	job_id in ('FI_ACCOUNT', 'IT_PROG')
+	
+	
+explain (analyze, buffers)
+SELECT
+	last_name,
+	job_id,
+	salary,
+	width_bucket (salary, 5000, 20000, 4)
+FROM
+	employees
+
+	
+	
+	
+	
+	
+	
+
+
+
+
+
+
+
+
