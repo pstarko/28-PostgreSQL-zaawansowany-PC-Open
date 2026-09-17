@@ -1,0 +1,22 @@
+/*
+1. Opisz za pomocą REGEXP_LIKE
+
+select
+	REGEXP_LIKE('12345678901', '^[0-9]{11}$')
+
+
+/*
+1. Opisz za pomocą REGEXP_LIKE
+
+b. Kod w formacie (2litery, 3 liczby, 1 litera) - tylko wielkie litery np., AG234D
+
+d. Adres e-mail w formacie (imię.nazwa@domena.com)
+
+
+*/
+
+SELECT REGEXP_LIKE('AG234D', '^[A-Z]{2}[0-9]{3}[A-Z]{1}$')
+
+
+SELECT REGEXP_LIKE('g.kowalski@domena.com', '^[A-Za-z]+\.[A-Za-z]+@[A-Za-z]{2,}\.com$');
+
