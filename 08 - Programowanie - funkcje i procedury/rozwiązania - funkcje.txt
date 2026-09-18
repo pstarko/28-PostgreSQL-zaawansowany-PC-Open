@@ -72,3 +72,21 @@ $$ LANGUAGE plpgsql;
 
 SELECT * FROM get_column_summary3('departments', 'department_name, department_id');
 
+
+--3. Generator Listy Pracowników Działu:
+CREATE OR REPLACE FUNCTION get_department_roster(dept_id int)
+RETURNS TABLE(first_name varchar, last_name varchar) 
+AS $$
+BEGIN
+    RETURN QUERY 
+	    SELECT e.first_name, e.last_name
+	    FROM employees e
+	    WHERE e.department_id = dept_id;
+END;
+$$ LANGUAGE plpgsql;
+
+explain
+
+SELECT * FROM get_department_roster(20);
+
+
