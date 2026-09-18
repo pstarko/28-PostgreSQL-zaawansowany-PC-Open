@@ -1,0 +1,74 @@
+--2. Dynamiczny Audytor Danych:
+
+CREATE OR REPLACE FUNCTION get_column_summary(
+    table_name text, 
+    column_name text
+)
+RETURNS TABLE(value text) 
+AS $$
+declare 	
+	query text;
+BEGIN
+	  query := 
+		'SELECT ' || quote_ident(column_name) || '::text AS result FROM ' || quote_ident(table_name);
+    RETURN QUERY EXECUTE query;
+END;
+$$ LANGUAGE plpgsql;
+
+
+SELECT * FROM get_column_summary('departments', 'department_name');
+
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION get_column_summary2(
+    table_name text,
+    column_names text
+)
+RETURNS TABLE(value text)
+AS $$
+DECLARE
+    query text;
+    cols  text;
+BEGIN
+    -- rozbij listę kolumn po przecinku, oczyść spacje, dociąż quote_ident do każdej z osobna
+    SELECT string_agg(quote_ident(trim(c)), ', ')
+    INTO cols
+    FROM unnest(string_to_array(column_names, ',')) AS c;
+
+    query := 'SELECT (' || cols || ')::text AS value FROM ' || quote_ident(table_name);
+    RETURN QUERY EXECUTE query;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT * FROM get_column_summary2('departments', 'department_name, department_id');
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION get_column_summary3(
+    table_name text,
+    column_names text
+)
+RETURNS SETOF json
+AS $$
+DECLARE
+    query text;
+    cols  text;
+BEGIN
+    SELECT string_agg(quote_ident(trim(c)), ', ')
+    INTO cols
+    FROM unnest(string_to_array(column_names, ',')) AS c;
+
+    query := 'SELECT row_to_json(t) FROM (SELECT ' || cols || ' FROM ' || quote_ident(table_name) || ') t';
+    RETURN QUERY EXECUTE query;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT * FROM get_column_summary3('departments', 'department_name, department_id');
+
