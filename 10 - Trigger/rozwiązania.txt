@@ -57,3 +57,79 @@ CALL dodaj_produkt_i_magazyn('Wrocława', 'Tablet', 2500);
 select * from produkty
 
 select * from magazyn
+
+
+
+CREATE OR REPLACE FUNCTION sprawdz_cene_produktu()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.cenaZakupu <= 0 THEN
+        RAISE EXCEPTION 'Nie można dodać produktu z ceną poniżej zera. Podana cena: %', NEW.cenaZakupu;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sprawdz_cene_produktu
+BEFORE INSERT OR UPDATE ON Produkty
+FOR EACH ROW
+EXECUTE FUNCTION sprawdz_cene_produktu();
+
+
+CALL dodaj_produkt_i_magazyn('Warszawa', 'Myszka', 50);
+
+
+
+
+
+-- Tworzenie tabeli logów
+CREATE TABLE LogiZmianCen (
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    idProduktu INT NOT NULL,
+    idMagazynu INT NOT NULL,
+    staraCena INT,
+    nowaCena INT NOT NULL,
+    dataZmiany TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    typOperacji VARCHAR(10) NOT NULL
+);
+
+-- Tworzenie funkcji dla triggera
+CREATE OR REPLACE FUNCTION log_zmian_cen()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Dla operacji INSERT
+    IF TG_OP = 'INSERT' THEN
+        -- Dla nowych produktów zawsze zapisujemy log
+		raise notice '% ', TG_OP;
+        INSERT INTO LogiZmianCen (idProduktu, idMagazynu, staraCena, nowaCena, typOperacji)
+        VALUES (NEW.idProduktu, NEW.idMagazynu, NULL, NEW.cenaZakupu, 'INSERT');
+        
+    -- Dla operacji UPDATE
+    ELSIF TG_OP = 'UPDATE' THEN
+        -- Sprawdzamy czy cena się zmieniła i czy nowa cena jest wyższa od starej
+		raise notice '% ', TG_OP;
+        IF NEW.cenaZakupu != OLD.cenaZakupu AND NEW.cenaZakupu > OLD.cenaZakupu THEN
+            INSERT INTO LogiZmianCen (idProduktu, idMagazynu, staraCena, nowaCena, typOperacji)
+            VALUES (NEW.idProduktu, NEW.idMagazynu, OLD.cenaZakupu, NEW.cenaZakupu, 'UPDATE');
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Tworzenie triggera
+CREATE TRIGGER trg_log_zmian_cen
+AFTER INSERT OR UPDATE ON Produkty
+FOR EACH ROW
+EXECUTE FUNCTION log_zmian_cen();
+
+select * from produkty
+
+update produkty set cenazakupu = 1555 where idproduktu = 11
+
+CALL dodaj_produkt_i_magazyn('Poznań', 'Monitor', 1450);
+
+
+select * from LogiZmianCen
+	
