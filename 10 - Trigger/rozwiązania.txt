@@ -1,0 +1,59 @@
+create table Produkty 
+	(idProduktu INT GENERATED ALWAYS AS identity primary key, 
+	idMagazynu int,
+	nazwaProduktu varchar(50), 
+	cenaZakupu int )
+	
+	
+create table Magazyn 
+	(idMagazynu int primary key,
+	Miasto varchar(50) )
+	
+alter table Produkty add foreign key (idMagazynu) 
+references Magazyn (idMagazynu)
+
+
+CREATE OR REPLACE PROCEDURE dodaj_produkt_i_magazyn(
+    p_miasto VARCHAR(50),
+    p_nazwa_produktu VARCHAR(50),
+    p_cena_zakupu INT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_id_magazynu INT;
+BEGIN
+    -- Sprawdzenie, czy magazyn w danym mieście już istnieje
+    SELECT idMagazynu INTO v_id_magazynu
+    FROM Magazyn
+    WHERE Miasto = p_miasto;
+    
+    -- Jeśli magazyn nie istnieje, dodaj nowy
+    IF v_id_magazynu IS NULL THEN
+        -- Znajdź następny dostępny ID dla magazynu
+        SELECT COALESCE(MAX(idMagazynu), 0) + 1 INTO v_id_magazynu
+        FROM Magazyn;
+        
+        -- Dodaj nowy magazyn
+        INSERT INTO Magazyn (idMagazynu, Miasto)
+        VALUES (v_id_magazynu, p_miasto);
+    END IF;
+    
+	
+    -- Dodaj produkt do istniejącego lub nowo utworzonego magazynu
+    INSERT INTO Produkty (idMagazynu, nazwaProduktu, cenaZakupu)
+    VALUES (v_id_magazynu, p_nazwa_produktu, p_cena_zakupu);
+            
+    RAISE NOTICE 'Dodano produkt % do magazynu w mieście %', p_nazwa_produktu, p_miasto;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE EXCEPTION 'Wystąpił błąd: %', SQLERRM;
+END;
+$$;
+
+CALL dodaj_produkt_i_magazyn('Wrocława', 'Tablet', 2500);
+
+select * from produkty
+
+select * from magazyn
