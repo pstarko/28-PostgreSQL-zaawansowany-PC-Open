@@ -1,0 +1,443 @@
+--SQL
+--PLpgSQL
+
+--IN
+create or replace function fun2(var_emp  int)
+returns varchar
+as $$
+declare 
+	x varchar(100);
+begin 
+	select 
+		last_name into x
+		from employees
+	where employee_id = var_emp;
+	
+	if not found then
+		raise 'Brak danych';
+	end if;
+
+return x;
+end $$ language plpgsql
+
+select fun2(99)
+
+--parametr domyślny
+CREATE OR REPLACE FUNCTION fun_dom(x int = 50)
+	returns int
+as $$
+	select x;
+$$ language sql
+
+
+select fun_dom(100), fun_dom()
+
+--default -- second version
+create or replace function fun5(x int default 10)
+returns int
+as $$
+declare 
+	zmienna int;
+begin 
+	select 
+		x into zmienna;
+return x;
+end $$ language plpgsql
+
+
+create or replace function fun1(var_salary int)
+returns int
+language plpgsql 
+as $$
+declare 
+	x int:=0;
+begin 
+	select 
+		count(*) into x
+		from employees
+	where salary > var_salary;
+return x;
+end $$ 
+
+select fun1(15000)
+select fun1(var_salary:=10000)
+select fun1(var_salary=>10000)
+
+----------
+
+
+
+--RETURNS TABLE
+create or replace function get_name(id int)
+returns table (first_name varchar, last_name varchar)
+as $$
+begin
+	return query
+	select 
+		e.first_name,
+		e.last_name
+		from employees e
+	where employee_id = id;
+end
+$$ language plpgsql;
+
+explain analyze
+select * from get_name(100)
+
+--temat optymalizacji
+create or replace view v_emp_50
+as
+select 
+		e.first_name,
+		e.last_name
+		from employees e
+		where department_id = 50
+		
+explain
+select * from v_emp_50
+
+
+create or replace function get_name2(id int)
+returns table (first_name varchar, last_name varchar)
+as $$
+begin
+    return query
+    select 
+        e.first_name,
+        e.last_name
+        from employees e
+    where employee_id = id;
+end
+$$ language plpgsql
+rows 1;
+
+explain analyze
+select * from get_name2(100)
+
+create or replace function get_name3(id int)
+returns table (first_name varchar, last_name varchar)
+as $$
+    select e.first_name, e.last_name
+    from employees e
+    where employee_id = id;
+$$ language sql stable;
+
+explain analyze
+select * from get_name3(100)
+
+
+
+
+create or replace function fun1()
+returns table (suma integer)
+language plpgsql
+as 
+$$ 
+begin
+	SELECT
+		10 as ans;
+end;
+$$ 
+
+select * from fun1(1000)
+--ERROR: nie wskazano gdzie mają zostać zapisane wyniki zapytania
+
+create or replace function fun1()
+returns table (suma integer)
+language plpgsql
+as 
+$$ 
+begin
+	PERFORM
+		10 as ans;
+end;
+$$ 
+
+select * from fun1(1000)
+--pusty wyniki (Perform nic nie zwraca - do użycia przy funkcji z update -> DO $$ BEGIN PERFORM fun1(); END; $$;
+
+
+drop function fun1
+
+create or replace function fun1(out a int)
+language plpgsql
+as 
+$$ 
+begin
+	SELECT
+		10 as ans into fun1.a;
+end;
+$$ 
+
+select * from fun1()
+--jest ok
+
+create or replace function fun1(out i int)
+language plpgsql
+as 
+$$ 
+begin
+	i:= 40;
+	return; --nie potrzebujemy wpisywać zmiennej
+end;
+$$ 
+
+select * from fun1()
+drop function fun1
+
+
+--SETOF --RETURNS SETOF composite_type - gdy potrzebujemy zdefiniowanego typu
+create or replace function fun1()
+returns setof INT 
+language plpgsql
+as 
+$$ 
+begin
+	return next 10;
+	return next 100;
+end;
+$$ 
+
+select * from fun1()
+drop function fun1
+
+--SETOF composite_type
+-- Najpierw definiujemy typ złożony
+CREATE TYPE employee_info AS (
+    employee_id numeric,
+    full_name text,
+    job_title varchar(50),
+    rate numeric
+);
+
+-- Następnie tworzymy funkcję zwracającą zbiór tego typu
+CREATE OR REPLACE FUNCTION get_employees_info(p_dept_id numeric)
+RETURNS SETOF employee_info AS $$
+DECLARE
+    emp_record employee_info;
+BEGIN
+    -- Możemy wykonać złożoną logikę przed zwróceniem wyników
+    -- np. walidację, obliczenia, itp.    
+    FOR emp_record IN (SELECT 
+            employee_id,
+            first_name || ' ' || last_name,
+            job_id,
+            salary
+        FROM employees
+        WHERE department_id = p_dept_id) LOOP
+        RETURN NEXT emp_record;
+    END LOOP;
+    
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+
+select * from get_employees_info(2)
+
+--SETOF record
+CREATE OR REPLACE FUNCTION get_complex_employee_data(p_rate numeric)
+RETURNS SETOF record AS $$
+DECLARE
+    temp_table_name text;
+    query text;
+BEGIN
+    -- Tworzymy tymczasową tabelę
+    temp_table_name := 'temp_emp_' || md5(random()::text);
+    
+    -- Poprawiona składnia - USING jest częścią instrukcji EXECUTE
+    EXECUTE format('CREATE TEMP TABLE %I AS
+        SELECT 
+            departmentname,
+            COUNT(*) AS employee_count,
+            AVG(rate) AS avg_rate
+        FROM emp
+        WHERE rate > $1
+        GROUP BY departmentname', temp_table_name)
+    USING p_rate;
+    
+    -- Możemy wykonać dodatkowe operacje na tymczasowej tabeli
+    EXECUTE format('UPDATE %I SET avg_rate = ROUND(avg_rate, 2)', temp_table_name);
+    
+    -- Zwracamy wyniki
+    RETURN QUERY EXECUTE format('SELECT * FROM %I', temp_table_name);
+    
+    -- Usuwamy tymczasową tabelę
+    EXECUTE format('DROP TABLE %I', temp_table_name);
+END;
+$$ LANGUAGE plpgsql;
+
+
+SELECT * FROM get_complex_employee_data(15) AS 
+(dept_name varchar, emp_count bigint, average_rate numeric);
+
+
+
+
+--ROWTYPE
+create or replace function fun1()
+returns setof emp
+	--return table (empid int, lastname varchar)
+language plpgsql
+as 
+$$ 
+declare
+	md employees%ROWTYPE;
+begin
+	md.employee_id := 100; md.last_name := 'Kozak';
+	return next md;
+	md.employee_id := 101; md.last_name := 'Kot';
+	return next md;
+end;
+$$ 
+select * from fun1()
+drop function fun1
+
+
+
+--zwracanie tablicy
+SELECT unnest(ARRAY[1,2]);
+
+CREATE OR REPLACE FUNCTION fun_arr(int_array int[])
+	returns bigint
+as $$
+	select sum(a)
+	from ( select unnest(int_array) a) t1;
+$$ language sql
+
+select fun_arr(array[10,11,12])
+
+
+----PARAMETR OUT
+create or replace function fun3(out var_max  int, out var_min int)
+language plpgsql
+as $$
+begin 
+	select 
+		max(salary),
+		min(salary) into var_max, var_min
+		from employees;
+end $$
+
+SELECT * FROM fun3();
+
+drop function fun3
+
+----PARAMETR IN/OUT
+create or replace function fun4(inout var_max  int, inout var_min int)
+language plpgsql
+as $$
+begin 
+	select 
+		var_max, var_min into var_max, var_min;
+end $$
+
+select fun4(3,4)
+select * from fun4(45,32)
+
+drop function fun4
+
+
+
+--PRZECIĄŻENIE FUNKCJI
+--polimorfizm (przeciążenia)
+create or replace function poli(x int, y int) returns int
+language sql as 'SELECT x+y;';
+
+create or replace function poli(x float, y float) returns float
+language sql as 'SELECT x+y;';
+
+create or replace function phi() returns float
+language sql as 'SELECT 99';
+
+
+
+select poli(2,5), poli(4.9, phi());
+
+select poli('A'::CHAR, 'B'::CHAR);
+
+
+
+--RETURN TABLE
+create or replace function fun6(var_salary numeric)
+	returns table (
+		id employees.employee_id%TYPE,
+		ln varchar
+	)
+language plpgsql
+as $$
+begin 
+	return query
+		select
+			employee_id ,
+			last_name 
+		from employees e
+		where salary > var_salary;	
+end $$
+
+select * from fun6(1000)
+
+--USE FOR
+create or replace function fun6(var_salary numeric)
+	returns table (
+		id employees.employee_id%TYPE,
+		ln varchar
+	)
+language plpgsql
+as $$
+declare
+	var_record record;
+begin 
+	for var_record in (
+		select employee_id, last_name
+		from employees
+		where salary>var_salary
+	) loop 
+		id:=var_record.employee_id;
+		ln:=var_record.last_name;
+	return next;
+	end loop;	
+end $$
+
+select * from fun6(1000)
+
+
+
+--DODATKOWO
+
+--połączenie z tabelą a optymalizacja
+drop function get_name
+/*
+IMMUTABLE wskazuje, że funkcja nie może modyfikować bazy danych i zawsze zwraca ten sam wynik, 
+gdy otrzymuje te same wartości argumentów; 
+oznacza to, że nie wykonuje wyszukiwania w bazie danych ani w inny sposób nie wykorzystuje informacji, 
+które nie są bezpośrednio obecne na liście argumentów. 
+Jeśli ta opcja jest podana, każde wywołanie funkcji ze stałymi argumentami może zostać natychmiast zastąpione 
+wartością funkcji.
+
+IMMUTABLE musi być czystą funkcją, której wyniki zależą tylko od jej danych wejściowych. 
+Jest to bardzo surowy wymóg; 
+
+nie mogą one wywoływać innych niezmiennych funkcji, 
+nie mogą uzyskiwać dostępu do tabel(DML), 
+nie mogą uzyskiwać dostępu do wartości właściwości konfiguracji itp.
+*/
+--stwórz najpierw bez IMMUTABLE i pokaże EXPLAIN, następnie dodaj IMMUTABLE i zobacz różnicę
+create or replace function get_name(dept_id numeric)
+returns table (first_name varchar, last_name varchar, deptartment_id int)
+immutable
+as $$
+	select 
+		first_name,
+		last_name,
+		department_id
+		from employees
+	where department_id = dept_id;
+$$ language sql;
+
+explain
+select * from departments d join lateral get_name(d.department_id) on true
+
+explain
+select 
+	* from departments d join employees e on e.department_id =d.department_id 
